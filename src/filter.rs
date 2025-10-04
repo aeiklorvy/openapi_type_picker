@@ -53,7 +53,7 @@ pub enum SchemaFilter {
 }
 
 impl SchemaFilter {
-    pub fn is_accepted(&self, name: &str) -> bool {
+    pub(super) fn is_accepted(&self, name: &str) -> bool {
         match self {
             SchemaFilter::AcceptAll(_) => true,
             SchemaFilter::AcceptSelected(items) => items.iter().any(|i| i == name),
@@ -83,7 +83,7 @@ impl FilterConfig {
         }
     }
 
-    pub fn is_schema_accepted(&self, schema_name: &str) -> bool {
+    pub(super) fn is_schema_accepted(&self, schema_name: &str) -> bool {
         // if a list of inclusions is specified
         if let Some(schemas) = &self.include {
             // then only the listed ones are suitable
@@ -103,7 +103,7 @@ impl FilterConfig {
         true
     }
 
-    pub fn is_property_accepted(&self, schema_name: &str, property_name: &str) -> bool {
+    pub(super) fn is_property_accepted(&self, schema_name: &str, property_name: &str) -> bool {
         // if a list of inclusions is specified, then only those listed are
         // suitable
         if let Some(schemas) = &self.include {
