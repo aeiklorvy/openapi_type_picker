@@ -57,7 +57,7 @@ pub enum Schema {
 impl OpenApi {
     /// Read specifiaction from string
     pub fn from_str(data: &str) -> Self {
-        if data.starts_with("{") {
+        if data.trim_start().starts_with("{") {
             serde_json::from_str(data).unwrap()
         } else {
             serde_yaml::from_str(data).unwrap()

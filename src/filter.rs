@@ -39,6 +39,10 @@ pub struct FilterConfig {
     /// default, `#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd,
     /// Ord, serde::Deserialize)]`.
     pub enum_derives: Option<Vec<String>>,
+    /// automatically adds schemas to the filter if the fields of another
+    /// schema refer to it
+    #[serde(default)]
+    pub auto_include_dependencies: bool,
 }
 
 /// Filter element: either "*" or an array of strings
@@ -64,7 +68,7 @@ impl SchemaFilter {
 impl FilterConfig {
     /// Read configuration from string
     pub fn from_str(data: &str) -> Self {
-        if data.starts_with("{") {
+        if data.trim_start().starts_with("{") {
             serde_json::from_str(data).unwrap()
         } else {
             serde_yaml::from_str(data).unwrap()
@@ -81,6 +85,17 @@ impl FilterConfig {
         } else {
             panic!("Couldn't determine the config file format");
         }
+    }
+
+    pub(super) fn is_schema_present(&self, schema_name: &str) -> bool {
+        // Just check if the schema is found somewhere in the filter
+        if let Some(schemas) = &self.include {
+            return schemas.contains_key(schema_name);
+        }
+        if let Some(schemas) = &self.exclude {
+            return schemas.contains_key(schema_name);
+        }
+        false
     }
 
     pub(super) fn is_schema_accepted(&self, schema_name: &str) -> bool {
@@ -104,6 +119,10 @@ impl FilterConfig {
     }
 
     pub(super) fn is_property_accepted(&self, schema_name: &str, property_name: &str) -> bool {
+        if self.auto_include_dependencies && !self.is_schema_present(schema_name) {
+            // in this case, automatic include is used
+            return true;
+        }
         // if a list of inclusions is specified, then only those listed are
         // suitable
         if let Some(schemas) = &self.include {

@@ -1,6 +1,6 @@
 ## Quick start
 
-Let's assume that I have this description of the shema (https://learn.openapis.org/examples/v3.0/petstore.html):
+Let's assume that there is some specification from which it is required to generate only certain types of data (let's call it `schema.json`):
 ```json
 {
   "openapi": "3.0.0",
@@ -41,7 +41,7 @@ Let's assume that I have this description of the shema (https://learn.openapis.o
   }
 }
 ```
-And there is also such a configuration file, because I don't need all the fields of all data types:
+And there is also such a configuration file, because I don't need all the fields of all data types (`config.json`):
 ```json
 {
   "include": {     // generate only "Pet" struct
@@ -49,11 +49,11 @@ And there is also such a configuration file, because I don't need all the fields
   }
 }
 ```
-In order to generate a file with the definition of data types, in the file `build.rs` we need to add a function call:
+In order to generate a file with the definition of data types, in the file `build.rs` need to add a function call:
 ```rust
 use openapi_type_picker::*;
 fn main() {
-    generate_openapi_types(
+    write_openapi_types(
         OpenApi::from_file("../schema.json"),
         FilterConfig::from_file("../config.json"),
         "src/api/types.rs" // path to output file
@@ -83,6 +83,7 @@ The configuration file allows you to configure the following:
 - `exclude`: schemas that do not need to be generated;
 - `struct_derives`: defines a list of `#[derive(...)]` when generating the structure, by default `["Debug", "Clone", "Deserialize"]`;
 - `enum_derives`: defines a list of `#[derive(...)]` when generating an enumeration, by default `["Debug", "Clone", "Copy", "PartialEq", "Eq", "PartialOrd", "Ord", "Deserialize"]`.
+- `auto_include_dependencies`: if `true`, automatically adds schemas to the filter if the fields of another schema refer to it. Default is `false`. See the next chapter for details.
 
 For examples, the petstore demo scheme is used from the very beginning: https://learn.openapis.org/examples/v3.0/petstore.html.
 
@@ -110,7 +111,9 @@ The exact same format is used to describe exclusions, i.e. structures that do no
   }
 }
 ```
-But if the schema has only a specific list of properties, then the corresponding structure will still be generated, but without the specified fields (in this example, only `Pet::id` will be generated):
+In fact, this filter will panic, since `Pets` in specification refers to a `Pet` schema that is not present in the filter.
+
+If the schema has only a specific list of properties, then the corresponding structure will still be generated, but without the specified fields (in this example, only `Pet::id` will be generated):
 ```json
 {
   "exclude": {
@@ -134,10 +137,33 @@ pub struct Pet {
 }
 ```
 
-**Important note on the operation of filters:**
-> If a schema is included in the config, the property of which represents a link to another schema, then this "child" schema should also be included in the config. Otherwise, the generator will give an error about the presence of a field with a type link, the structure for which will not be generated.
+## How does automatic dependency inclusion work?
 
-At first, I thought of solving this through a recursive dependency lookup. But then, if the found schemes had not been included in the filter, their generation would have caused a contradiction. If these schemes had been included in the filter, they would still have been generated. Basically, it's working the way it is right now.
+Two concepts should be distinguished: the scheme is *presented* in the filter and the scheme is *included/excluded* in the filter. The first means that the scheme was not added to the filter at all. Roughly speaking, nowhere in the filter will we find a string with the name of such a scheme. The second means that the scheme is found in the filter in inclusions or exclusions. That is, the scheme is presented, and some restrictions apply to it.
+
+By default, `auto_include_dependencies` is disabled (`false`). This means that only the schemes allowed by the filter will be generated, and no others. If a field in one schema refers to another that is not included in the filter, it will cause a generation error.
+
+When the `auto_include_dependencies` is enabled (`true`), the behavior changes: if the scheme is not presented in the filter, it will be automatically included in the list of schemes to generate with its properties. Otherwise, if the scheme is restricted by a filter, then the dependency search will take into account only the fields of this scheme that match the filter.
+
+Let's take a small filter example and analyze what `auto_include_dependencies` does.
+```json
+{
+  "include": {
+    "Pets": "*",
+  }
+}
+```
+If `auto_include_dependencies = false` (default), the generator will return an error because it will not be able to build the correct Rust code:
+```rust
+type Pets = Vec<Pet>;
+// error: there is no `Pet` type
+```
+To solve this problem, you can either include the missing schemas in the filter, or activate the `auto_include_dependencies` setting. If `auto_include_dependencies = true`, then the generator will automatically detect that `Pets` refers to `Pet` and generate it too:
+```rust
+type Pets = Vec<Pet>;
+struct Pet { ... }
+// success: `Pet` is defined
+```
 
 ## Automatic generation during build
 

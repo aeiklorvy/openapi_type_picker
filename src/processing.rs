@@ -8,14 +8,30 @@ pub fn process_components(
     spec: &OpenApi,
     filter: &FilterConfig,
 ) -> Result<Vec<DataType>, Box<dyn Error>> {
+    let mut dependencies = vec![];
     let mut datatypes = vec![];
+
     for (schema_name, definition) in spec.components.schemas.iter() {
         if !filter.is_schema_accepted(schema_name) {
             continue;
         }
         let datatype = process_schema(schema_name, definition, filter)?;
         datatypes.push(datatype);
+        if filter.auto_include_dependencies {
+            find_dependend_schemas(&schema_name, spec, filter, &mut dependencies);
+        }
     }
+
+    for schema_name in dependencies {
+        if datatypes.iter().any(|dt| dt.schema_name() == schema_name) {
+            // already added
+            continue;
+        }
+        if let Some(definition) = spec.components.schemas.get(&schema_name) {
+            datatypes.push(process_schema(&schema_name, definition, filter)?);
+        }
+    }
+
     Ok(datatypes)
 }
 
@@ -209,4 +225,41 @@ fn is_primitive_type(typename: &str) -> bool {
         typename,
         "string" | "number" | "boolean" | "integer" | "array" | "object"
     )
+}
+
+/// Находи список подчиненных схем с учетом фильтра
+fn find_dependend_schemas(
+    schema_name: &str,
+    spec: &OpenApi,
+    filter: &FilterConfig,
+    dependencies: &mut Vec<String>,
+) {
+    if let Some(definition) = spec.components.schemas.get(schema_name) {
+        if let Ok(dt) = process_schema(schema_name, definition, filter) {
+            match dt {
+                DataType::Struct { fields, .. } => {
+                    for field in fields {
+                        if is_primitive_type(&field.type_) {
+                            return;
+                        }
+                        if !dependencies.contains(&field.type_) {
+                            dependencies.push(field.type_.clone());
+                            find_dependend_schemas(&field.type_, spec, filter, dependencies);
+                        }
+                    }
+                }
+                DataType::Alias { info, .. } => {
+                    if is_primitive_type(&info.type_) {
+                        return;
+                    }
+                    if !dependencies.contains(&info.type_) {
+                        dependencies.push(info.type_.clone());
+                        find_dependend_schemas(&info.type_, spec, filter, dependencies);
+                    }
+                }
+                // refs in enums are not possible
+                DataType::Enum { .. } => (),
+            }
+        }
+    }
 }
