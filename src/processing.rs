@@ -207,6 +207,6 @@ pub fn find_missing_schemas(datatypes: &[DataType]) -> Vec<String> {
 fn is_primitive_type(typename: &str) -> bool {
     matches!(
         typename,
-        "string" | "number" | "boolean" | "integer" | "array"
+        "string" | "number" | "boolean" | "integer" | "array" | "object"
     )
 }

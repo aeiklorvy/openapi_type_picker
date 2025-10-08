@@ -146,6 +146,7 @@ fn get_rust_type(typename: &str, format: &str) -> String {
             "int64" => "i64".to_owned(),
             _ => "i32".to_owned(),
         },
+        "object" => "serde_json::Value".to_owned(),
         // otherwise, it is the name of a type (struct, enum or alias)
         struct_name => struct_name.to_case(Case::Pascal),
     }
