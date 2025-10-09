@@ -1,6 +1,6 @@
 # OpenAPI Type Picker
 
-This library is designed to generate Rust data types from the OpenAPI specification. It is very useful in situations where API is too versatile and has several hundred methods, and your service needs to work with only a small number of them. The library does not generate API calls like it does (openapi generator)[https://openapi-generator.tech], providing freedom of choice of methods and tools.
+This library is designed to generate Rust data types from the OpenAPI specification. It is very useful in situations where API is too versatile and has several hundred methods, and your service needs to work with only a small number of them. The library does not generate API calls like it does openapi generator (<https://openapi-generator.tech>), providing freedom of choice of methods and tools.
 
 ## Quick start
 
@@ -88,7 +88,7 @@ The configuration file allows you to configure the following:
 - `enum_derives`: defines a list of `#[derive(...)]` when generating an enumeration, by default `["Debug", "Clone", "Copy", "PartialEq", "Eq", "PartialOrd", "Ord", "Deserialize"]`.
 - `auto_include_dependencies`: if `true`, automatically adds schemas to the filter if the fields of another schema refer to it. Default is `false`. See the next chapter for details.
 
-For examples, the petstore demo scheme is used from the very beginning: https://learn.openapis.org/examples/v3.0/petstore.html.
+For examples, the petstore demo scheme is used from the very beginning: <https://learn.openapis.org/examples/v3.0/petstore.html>.
 
 The values `include` and `exclude` must be an object from the schema name and its fields. For example, such a configuration means that you only need to generate a structure for the `Pet` schema, which should have only the `id` field:
 ```json

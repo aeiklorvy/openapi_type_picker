@@ -26,6 +26,17 @@ impl DataType {
             DataType::Alias { alias, .. } => &alias,
         }
     }
+
+    /// Sorts the fields in alphabetical order
+    pub fn sort_fields(&mut self) {
+        match self {
+            DataType::Struct { fields, .. } => {
+                fields.sort_by(|a, b| a.name.cmp(&b.name));
+            }
+            DataType::Enum { items, .. } => items.sort(),
+            DataType::Alias { .. } => (),
+        }
+    }
 }
 
 /// Representation of schema object properties as structure fields

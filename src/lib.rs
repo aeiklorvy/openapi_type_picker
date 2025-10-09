@@ -55,11 +55,17 @@ pub fn generate_openapi_types(
     openapi: OpenApi,
     config: FilterConfig,
 ) -> Result<String, Box<dyn Error>> {
-    let datatypes = processing::process_components(&openapi, &config)?;
+    let mut datatypes = processing::process_components(&openapi, &config)?;
     let missing_schemas = processing::find_missing_schemas(&datatypes);
     if !missing_schemas.is_empty() {
         let msg = format!("Found reference to missing schemas: {:?}", missing_schemas);
         return Err(msg.into());
+    }
+
+    // sort data types to reduce the changes in the version control system
+    datatypes.sort_by(|a, b| a.schema_name().cmp(b.schema_name()));
+    for dt in &mut datatypes {
+        dt.sort_fields();
     }
 
     let mut buf = String::with_capacity(1024);

@@ -6,7 +6,7 @@ use std::path::Path;
 /// OpenAPI root (minimal)
 ///
 /// For a reference on the structure, see
-/// https://learn.openapis.org/specification/
+/// <https://learn.openapis.org/specification/>
 #[derive(Deserialize)]
 pub struct OpenApi {
     pub components: Components,
