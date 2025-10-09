@@ -17,7 +17,7 @@ pub struct Components {
     pub schemas: HashMap<String, Schema>,
 }
 
-/// Универсальное описание схемы
+/// Universal description of the scheme
 #[derive(Deserialize)]
 #[serde(untagged)]
 pub enum Schema {
@@ -49,8 +49,12 @@ pub enum Schema {
         enum_items: Option<Vec<String>>,
 
         /// Compositions
-        #[serde(rename = "allOf", default)]
-        all_of: Vec<Schema>,
+        #[serde(rename = "allOf")]
+        all_of: Option<Vec<Schema>>,
+        #[serde(rename = "oneOf")]
+        one_of: Option<Vec<Schema>>,
+        #[serde(rename = "anyOf")]
+        any_of: Option<Vec<Schema>>,
     },
 }
 

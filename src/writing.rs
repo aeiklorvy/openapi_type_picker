@@ -1,4 +1,4 @@
-use crate::datatypes::DataType;
+use crate::datatypes::{DataType, FieldType};
 use convert_case::{Case, Casing};
 use std::fmt::{Result, Write};
 
@@ -19,12 +19,33 @@ pub fn write_rust_code<W: Write>(
     struct_derives: Option<&Vec<String>>,
     enum_derives: Option<&Vec<String>>,
 ) -> Result {
+    let indent = "    "; // 4 * <space>
+
+    // Necessary auxiliary types that were not present in the schema. These
+    // types are "invisible" and are only needed to ensure the correctness of
+    // the generated code.
+    let mut helper_types = vec![];
+
     writeln!(w, "use serde::Deserialize;")?;
     writeln!(w)?; // add newline
-    let indent = "    "; // 4 * <space>
+
     for dt in datatypes {
         match dt {
             DataType::Struct { name, fields } => {
+                // generate helper types
+                for field in fields {
+                    match &field.type_ {
+                        FieldType::Plain(_) => (),
+                        FieldType::OneOf(items) => {
+                            let name = generate_union_name(&items);
+                            if !helper_types.contains(&name) {
+                                helper_types.push(name);
+                                write_union_type(w, &items, struct_derives)?;
+                            }
+                        }
+                    }
+                }
+
                 writeln!(w, "/// {name}")?; // keep the original name
                 if let Some(derives) = struct_derives {
                     writeln!(w, "#[derive({})]", derives.join(", "))?;
@@ -35,7 +56,10 @@ pub fn write_rust_code<W: Write>(
                 for field in fields {
                     let rust_name = fix_rust_keyword(field.name.to_case(Case::Snake));
 
-                    let mut t = get_rust_type(&field.type_, &field.type_format);
+                    let mut t = match &field.type_ {
+                        FieldType::Plain(t) => get_rust_type(t, &field.type_format),
+                        FieldType::OneOf(items) => generate_union_name(&items),
+                    };
                     for _ in 0..field.array_dimensions {
                         t = format!("Vec<{t}>");
                     }
@@ -81,14 +105,26 @@ pub fn write_rust_code<W: Write>(
                 write_display_impl_for_enum(w, dt)?;
             }
             DataType::Alias { alias, info } => {
-                writeln!(w, "/// {}", alias)?; // keep the original name
-                let mut t = get_rust_type(&info.type_, &info.type_format);
+                let mut t = match &info.type_ {
+                    FieldType::Plain(t) => get_rust_type(t, &info.type_format),
+                    FieldType::OneOf(items) => {
+                        let name = generate_union_name(&items);
+                        if !helper_types.contains(&name) {
+                            helper_types.push(name.clone());
+                            write_union_type(w, &items, struct_derives)?;
+                        }
+                        name
+                    }
+                };
+
                 for _ in 0..info.array_dimensions {
                     t = format!("Vec<{t}>");
                 }
                 if info.is_nullable {
                     t = format!("Option<{t}>");
                 }
+
+                writeln!(w, "/// {alias}")?; // keep the original name
                 writeln!(w, "pub type {} = {t};\n", alias.to_case(Case::Pascal))?;
             }
         }
@@ -134,9 +170,9 @@ fn get_rust_type(typename: &str, format: &str) -> String {
         },
         "boolean" => "bool".to_owned(),
         "string" => match format {
-            // the expected value is in RFC 3339, "2017-07-21"
+            // the expected value is in RFC 3339/ISO 8601, "2017-07-21"
             "date" => "time::Date".to_owned(),
-            // the expected value is in RFC 3339, "2017-07-21T17:32:28Z"
+            // the expected value is in RFC 3339/ISO 8601, "2017-07-21T17:32:28Z"
             "date-time" => "time::OffsetDateTime".to_owned(),
             _ => "String".to_owned(),
         },
@@ -149,6 +185,35 @@ fn get_rust_type(typename: &str, format: &str) -> String {
         // otherwise, it is the name of a type (struct, enum or alias)
         struct_name => struct_name.to_case(Case::Pascal),
     }
+}
+
+/// Generates a name for the auxiliary structure, for example,
+/// `UnionNumberOrString`.
+fn generate_union_name(one_of: &[String]) -> String {
+    format!("_Union{}", one_of.join("Or").to_case(Case::Pascal))
+}
+
+/// Writes an "invisible" auxiliary structure
+fn write_union_type<W: Write>(
+    w: &mut W,
+    one_of: &[String],
+    struct_derives: Option<&Vec<String>>,
+) -> Result {
+    let indent = "    "; // 4 * <space>
+
+    // yes, this is an enum, but it is used only for combining structs, so
+    // derives from structs are used
+    if let Some(derives) = struct_derives {
+        writeln!(w, "#[derive({})]", derives.join(", "))?;
+    } else {
+        writeln!(w, "#[derive(Debug, Clone, Deserialize)]")?;
+    }
+    writeln!(w, "pub enum {} {{", generate_union_name(one_of))?;
+    for t in one_of {
+        let name = t.to_case(Case::Pascal);
+        writeln!(w, "{indent}{name}({name}),")?;
+    }
+    writeln!(w, "}}\n")
 }
 
 /// If the `name` matches the Rust keyword, a lower dash will be added to the

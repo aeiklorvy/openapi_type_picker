@@ -1,18 +1,18 @@
 /// Representation of a schema as a data type - a structure, enumeration, or
 /// type alias
-#[derive(Debug)]
 pub enum DataType {
+    /// The most common structure
     Struct {
         name: String,
         fields: Vec<StructField>,
     },
-    Enum {
-        name: String,
-        items: Vec<String>,
-    },
+    /// A flat enumeration, where each item is represented by a number
+    /// (also called unit-only enum)
+    Enum { name: String, items: Vec<String> },
+    /// An extra name for existing type
     Alias {
         alias: String,
-        // Use the StructField to represent the type information
+        // Use the StructField to represent the existing type information
         info: StructField,
     },
 }
@@ -29,12 +29,38 @@ impl DataType {
 }
 
 /// Representation of schema object properties as structure fields
-#[derive(Debug, Default)]
 pub struct StructField {
+    /// Field name
     pub name: String,
-    pub type_: String,
+    /// Field type
+    pub type_: FieldType,
+    /// "format" property, is present
     pub type_format: String,
+    /// The dimension of array:
+    /// * 0 = is not an array,
+    /// * 1 = is a flat array,
+    /// * 2 = an array of arrays (matrix)
+    /// * and so on
     pub array_dimensions: i32,
+    /// Can be null or not
     pub is_nullable: bool,
+    /// Comments
     pub descr: String,
+}
+
+pub enum FieldType {
+    /// Just type name
+    Plain(String),
+    /// Type name can be one of these values
+    OneOf(Vec<String>),
+}
+
+impl FieldType {
+    /// Returns a [`Vec`] of all possible field types
+    pub fn to_vec(&self) -> Vec<String> {
+        match self {
+            FieldType::Plain(t) => vec![t.clone()],
+            FieldType::OneOf(items) => items.clone(),
+        }
+    }
 }

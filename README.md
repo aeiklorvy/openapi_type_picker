@@ -1,3 +1,7 @@
+# OpenAPI Type Picker
+
+This library is designed to generate Rust data types from the OpenAPI specification. It is very useful in situations where API is too versatile and has several hundred methods, and your service needs to work with only a small number of them. The library does not generate API calls like it does (openapi generator)[https://openapi-generator.tech], providing freedom of choice of methods and tools.
+
 ## Quick start
 
 Let's assume that there is some specification from which it is required to generate only certain types of data (let's call it `schema.json`):
@@ -32,7 +36,6 @@ Let's assume that there is some specification from which it is required to gener
       },
       "Pets": {
         "type": "array",
-        "maxItems": 100,
         "items": {
           "$ref": "#/components/schemas/Pet"
         }
@@ -193,6 +196,6 @@ fn main() {
     // the path to the file where the data types will be written
     let generated_file = "src/api/types.rs";
     // performing the generation
-    generate_openapi_types(openapi, config, generated_file).unwrap();
+    write_openapi_types(openapi, config, generated_file).unwrap();
 }
 ```

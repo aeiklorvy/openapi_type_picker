@@ -1,4 +1,4 @@
-use crate::datatypes::{DataType, StructField};
+use crate::datatypes::{DataType, FieldType, StructField};
 use crate::filter::FilterConfig;
 use crate::openapi::{OpenApi, Schema};
 use std::error::Error;
@@ -108,11 +108,15 @@ fn process_schema_property(
         Schema::Ref { ref_ } => {
             return Ok(StructField {
                 name: name.to_owned(),
-                type_: ref_
-                    .strip_prefix("#/components/schemas/")
-                    .unwrap()
-                    .to_owned(),
-                ..Default::default()
+                type_: FieldType::Plain(
+                    ref_.strip_prefix("#/components/schemas/")
+                        .unwrap()
+                        .to_owned(),
+                ),
+                type_format: String::new(),
+                array_dimensions: 0,
+                is_nullable: false,
+                descr: String::new(),
             });
         }
         Schema::Typed {
@@ -124,6 +128,8 @@ fn process_schema_property(
             items,
             enum_items: _,
             all_of,
+            any_of,
+            one_of,
         } => {
             if let Some(_) = properties {
                 // "properties" is specified, which means it is an object. We
@@ -147,16 +153,25 @@ fn process_schema_property(
                 // in this case, it's a primitive type
                 return Ok(StructField {
                     name: name.to_owned(),
-                    type_: schema_type.clone(),
+                    type_: FieldType::Plain(schema_type.clone()),
                     type_format: format.clone(),
                     is_nullable: *nullable,
                     descr: description.clone(),
-                    ..Default::default()
+                    array_dimensions: 0,
                 });
             } else {
-                // nothing is specified, not even type - it's definitely a link
-                if !all_of.is_empty() {
-                    let mut field = process_schema_property(schema_name, name, &all_of[0])?;
+                // nothing is specified, not even type - it must be a link to
+                // other schemas
+                if let Some(schemas) = all_of {
+                    if schemas.len() > 1 {
+                        // composition currently not supported
+                        return Err(format!(
+                            "{schema_name:?}.{name:?}: expected one ref in `allOf`"
+                        )
+                        .into());
+                    }
+                    // behaves like a simple ref in this case
+                    let mut field = process_schema_property(schema_name, name, &schemas[0])?;
                     // trying to account for nullable
                     field.is_nullable = field.is_nullable | *nullable;
                     // trying to fill the description
@@ -164,11 +179,25 @@ fn process_schema_property(
                         field.descr = description.clone();
                     }
                     Ok(field)
+                } else if let Some(schemas) = one_of {
+                    // field can have one of the specified types
+                    let mut types = vec![];
+                    for schema in schemas {
+                        let field = process_schema_property(schema_name, name, schema)?;
+                        types.extend(field.type_.to_vec());
+                    }
+                    Ok(StructField {
+                        name: name.to_owned(),
+                        type_: FieldType::OneOf(types),
+                        type_format: String::new(),
+                        array_dimensions: 0,
+                        is_nullable: *nullable,
+                        descr: description.clone(),
+                    })
+                } else if let Some(_) = any_of {
+                    Err(format!("{schema_name:?}.{name:?}: `anyOf` is not supported").into())
                 } else {
-                    let msg = format!(
-                        "property {schema_name:?}.{name:?} is reference, but `allOf` is empty list"
-                    );
-                    Err(msg.into())
+                    Err(format!("property {schema_name:?}.{name:?} has unexpected format").into())
                 }
             }
         }
@@ -193,23 +222,27 @@ pub fn find_missing_schemas(datatypes: &[DataType]) -> Vec<String> {
             DataType::Enum { .. } => (),
             DataType::Struct { fields, .. } => {
                 for field in fields {
-                    // not looking for primitive types, they are always there
-                    if !is_primitive_type(&field.type_) {
-                        // trying to find the field type in the datatypes list
-                        if !datatypes.iter().any(|dt| dt.schema_name() == field.type_) {
-                            // didn't find it, it means an error
-                            missing_schemas.push(field.type_.clone());
+                    for t in field.type_.to_vec() {
+                        // not looking for primitive types, they are always there
+                        if !is_primitive_type(&t) {
+                            // trying to find the field type in the datatypes list
+                            if !datatypes.iter().any(|dt| dt.schema_name() == t) {
+                                // didn't find it, it means an error
+                                missing_schemas.push(t.clone());
+                            }
                         }
                     }
                 }
             }
             DataType::Alias { info, .. } => {
                 // not looking for primitive types, they are always there
-                if !is_primitive_type(&info.type_) {
-                    // trying to find the field type in the datatypes list
-                    if !datatypes.iter().any(|dt| dt.schema_name() == info.type_) {
-                        // didn't find it, it means an error
-                        missing_schemas.push(info.type_.clone());
+                for t in info.type_.to_vec() {
+                    if !is_primitive_type(&t) {
+                        // trying to find the field type in the datatypes list
+                        if !datatypes.iter().any(|dt| dt.schema_name() == t) {
+                            // didn't find it, it means an error
+                            missing_schemas.push(t.clone());
+                        }
                     }
                 }
             }
@@ -227,7 +260,7 @@ fn is_primitive_type(typename: &str) -> bool {
     )
 }
 
-/// Находи список подчиненных схем с учетом фильтра
+/// Populates a [`Vec`] of dependent schemas via recursion
 fn find_dependend_schemas(
     schema_name: &str,
     spec: &OpenApi,
@@ -239,22 +272,26 @@ fn find_dependend_schemas(
             match dt {
                 DataType::Struct { fields, .. } => {
                     for field in fields {
-                        if is_primitive_type(&field.type_) {
-                            return;
-                        }
-                        if !dependencies.contains(&field.type_) {
-                            dependencies.push(field.type_.clone());
-                            find_dependend_schemas(&field.type_, spec, filter, dependencies);
+                        for t in field.type_.to_vec() {
+                            if is_primitive_type(&t) {
+                                return;
+                            }
+                            if !dependencies.contains(&t) {
+                                dependencies.push(t.clone());
+                                find_dependend_schemas(&t, spec, filter, dependencies);
+                            }
                         }
                     }
                 }
                 DataType::Alias { info, .. } => {
-                    if is_primitive_type(&info.type_) {
-                        return;
-                    }
-                    if !dependencies.contains(&info.type_) {
-                        dependencies.push(info.type_.clone());
-                        find_dependend_schemas(&info.type_, spec, filter, dependencies);
+                    for t in info.type_.to_vec() {
+                        if is_primitive_type(&t) {
+                            return;
+                        }
+                        if !dependencies.contains(&t) {
+                            dependencies.push(t.clone());
+                            find_dependend_schemas(&t, spec, filter, dependencies);
+                        }
                     }
                 }
                 // refs in enums are not possible

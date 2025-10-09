@@ -46,7 +46,7 @@ pub struct FilterConfig {
 }
 
 /// Filter element: either "*" or an array of strings
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(untagged)]
 pub enum SchemaFilter {
     /// All properties are selected, i.e. `*`

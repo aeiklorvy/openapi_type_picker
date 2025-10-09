@@ -55,8 +55,8 @@ pub fn generate_openapi_types(
     openapi: OpenApi,
     config: FilterConfig,
 ) -> Result<String, Box<dyn Error>> {
-    let structs = processing::process_components(&openapi, &config)?;
-    let missing_schemas = processing::find_missing_schemas(&structs);
+    let datatypes = processing::process_components(&openapi, &config)?;
+    let missing_schemas = processing::find_missing_schemas(&datatypes);
     if !missing_schemas.is_empty() {
         let msg = format!("Found reference to missing schemas: {:?}", missing_schemas);
         return Err(msg.into());
@@ -66,7 +66,7 @@ pub fn generate_openapi_types(
     writing::write_comment_header(&mut buf)?;
     writing::write_rust_code(
         &mut buf,
-        &structs,
+        &datatypes,
         config.struct_derives.as_ref(),
         config.enum_derives.as_ref(),
     )?;
