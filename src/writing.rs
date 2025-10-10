@@ -4,16 +4,13 @@ use std::fmt::{Result, Write};
 
 /// Writes a description of the generated module (file)
 pub fn write_comment_header<W: Write>(w: &mut W) -> Result {
+    let now = time::OffsetDateTime::now_utc().to_string();
     writeln!(w, "//! # OpenApi Types")?;
     writeln!(w, "//! GENERATED AUTOMATICALLY, ALL THE CHANGES")?;
     writeln!(w, "//! YOU MAKE WILL BE REWRITTEN DURING")?;
     writeln!(w, "//! THE NEXT BUILD")?;
     writeln!(w, "//!")?;
-    writeln!(
-        w,
-        "//! Generated at: {}",
-        time::OffsetDateTime::now_utc().to_string()
-    )?;
+    writeln!(w, "//! Generated at: {now}")?;
     writeln!(w)?; // add newline
     Ok(())
 }
@@ -84,12 +81,12 @@ pub fn write_rust_code<W: Write>(
                         writeln!(w, "{indent}#[serde(rename = {:?})]", field.name)?;
                     }
                     // Special instructions are required for [`OffsetDateTime`]
-                    if t == "OffsetDateTime" {
-                        writeln!(w, "#[serde(with = \"time::serde::iso8601\")]")?;
-                    } else if t == "Option<OffsetDateTime>" {
+                    if t == "time::OffsetDateTime" {
+                        writeln!(w, "{indent}#[serde(with = \"time::serde::iso8601\")]")?;
+                    } else if t == "Option<time::OffsetDateTime>" {
                         writeln!(
                             w,
-                            "#[serde(with = \"time::serde::iso8601::option\", default)]"
+                            "{indent}#[serde(with = \"time::serde::iso8601::option\", default)]"
                         )?;
                     }
                     writeln!(w, "{indent}pub {rust_name}: {t},")?;
