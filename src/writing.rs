@@ -208,6 +208,7 @@ fn write_union_type<W: Write>(
     } else {
         writeln!(w, "#[derive(Debug, Clone, Deserialize)]")?;
     }
+    writeln!(w, "#[serde(untagged)]")?;
     writeln!(w, "pub enum {} {{", generate_union_name(one_of))?;
     for t in one_of {
         let name = t.to_case(Case::Pascal);

@@ -51,7 +51,6 @@ fn process_schema(
             Err(msg.into())
         }
         Schema::Typed {
-            schema_type,
             properties,
             enum_items,
             ..
@@ -77,16 +76,12 @@ fn process_schema(
                     name: schema_name.to_owned(),
                     items: items.clone(),
                 })
-            } else if is_primitive_type(&schema_type) {
-                // is this a schema without "properties", but with a "type" -
-                // is it legal? It's probably something like type alias
+            } else {
+                // let's assume that this is a type alias
                 Ok(DataType::Alias {
                     alias: schema_name.to_owned(),
                     info: process_schema_property(schema_name, "", definition)?,
                 })
-            } else {
-                let msg = format!("root item of {schema_name:?} must be object");
-                Err(msg.into())
             }
         }
     }
@@ -149,6 +144,39 @@ fn process_schema_property(
                     field.descr = description.clone();
                 }
                 Ok(field)
+            } else if let Some(schemas) = all_of {
+                if schemas.len() > 1 {
+                    // composition currently not supported
+                    return Err(
+                        format!("{schema_name:?}.{name:?}: expected one ref in `allOf`").into(),
+                    );
+                }
+                // behaves like a simple ref in this case
+                let mut field = process_schema_property(schema_name, name, &schemas[0])?;
+                // trying to account for nullable
+                field.is_nullable = field.is_nullable | *nullable;
+                // trying to fill the description
+                if field.descr.is_empty() && !description.is_empty() {
+                    field.descr = description.clone();
+                }
+                Ok(field)
+            } else if let Some(schemas) = one_of {
+                // field can have one of the specified types
+                let mut types = vec![];
+                for schema in schemas {
+                    let field = process_schema_property(schema_name, name, schema)?;
+                    types.extend(field.type_.to_vec());
+                }
+                Ok(StructField {
+                    name: name.to_owned(),
+                    type_: FieldType::OneOf(types),
+                    type_format: String::new(),
+                    array_dimensions: 0,
+                    is_nullable: *nullable,
+                    descr: description.clone(),
+                })
+            } else if let Some(_) = any_of {
+                Err(format!("{schema_name:?}.{name:?}: `anyOf` is not supported").into())
             } else if !schema_type.is_empty() {
                 // in this case, it's a primitive type
                 return Ok(StructField {
@@ -160,45 +188,15 @@ fn process_schema_property(
                     array_dimensions: 0,
                 });
             } else {
-                // nothing is specified, not even type - it must be a link to
-                // other schemas
-                if let Some(schemas) = all_of {
-                    if schemas.len() > 1 {
-                        // composition currently not supported
-                        return Err(format!(
-                            "{schema_name:?}.{name:?}: expected one ref in `allOf`"
-                        )
-                        .into());
-                    }
-                    // behaves like a simple ref in this case
-                    let mut field = process_schema_property(schema_name, name, &schemas[0])?;
-                    // trying to account for nullable
-                    field.is_nullable = field.is_nullable | *nullable;
-                    // trying to fill the description
-                    if field.descr.is_empty() && !description.is_empty() {
-                        field.descr = description.clone();
-                    }
-                    Ok(field)
-                } else if let Some(schemas) = one_of {
-                    // field can have one of the specified types
-                    let mut types = vec![];
-                    for schema in schemas {
-                        let field = process_schema_property(schema_name, name, schema)?;
-                        types.extend(field.type_.to_vec());
-                    }
-                    Ok(StructField {
-                        name: name.to_owned(),
-                        type_: FieldType::OneOf(types),
-                        type_format: String::new(),
-                        array_dimensions: 0,
-                        is_nullable: *nullable,
-                        descr: description.clone(),
-                    })
-                } else if let Some(_) = any_of {
-                    Err(format!("{schema_name:?}.{name:?}: `anyOf` is not supported").into())
-                } else {
-                    Err(format!("property {schema_name:?}.{name:?} has unexpected format").into())
-                }
+                // nothing is specified, not even type - believe that the field can be any object
+                Ok(StructField {
+                    name: String::new(),
+                    type_: FieldType::Plain("object".into()),
+                    type_format: String::new(),
+                    array_dimensions: 0,
+                    is_nullable: *nullable,
+                    descr: description.clone(),
+                })
             }
         }
     }

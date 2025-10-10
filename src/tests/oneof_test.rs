@@ -40,6 +40,7 @@ pub struct Mixed {
     // check helper types is also generated
     assert!(s.contains(
         r#"#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
 pub enum _UnionFirstOrSecond {
     First(First),
     Second(Second),
