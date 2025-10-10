@@ -199,3 +199,12 @@ fn main() {
     write_openapi_types(openapi, config, generated_file).unwrap();
 }
 ```
+
+## Dependencies in the generated code
+
+The generated code expects that the project will have the following libraries:
+```toml
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+time = { version = "0.3", features = ["serde-human-readable"] }
+```
