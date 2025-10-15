@@ -77,5 +77,8 @@ pub fn generate_openapi_types(
         config.enum_derives.as_ref(),
     )?;
 
+    // removing the double line break to appease rustfmt
+    buf.pop();
+
     Ok(buf)
 }
