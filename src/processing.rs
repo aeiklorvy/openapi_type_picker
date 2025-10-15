@@ -272,7 +272,7 @@ fn find_dependend_schemas(
                     for field in fields {
                         for t in field.type_.to_vec() {
                             if is_primitive_type(&t) {
-                                return;
+                                continue;
                             }
                             if !dependencies.contains(&t) {
                                 dependencies.push(t.clone());
@@ -284,7 +284,7 @@ fn find_dependend_schemas(
                 DataType::Alias { info, .. } => {
                     for t in info.type_.to_vec() {
                         if is_primitive_type(&t) {
-                            return;
+                            continue;
                         }
                         if !dependencies.contains(&t) {
                             dependencies.push(t.clone());
