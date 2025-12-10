@@ -42,8 +42,13 @@ pub enum Schema {
 
         /// Object properties if `{"type": "object"}`
         properties: Option<HashMap<String, Schema>>,
+
+        #[serde(default)]
+        required: Vec<String>,
+
         /// Array items if `{"type": "array"}`
         items: Option<Box<Schema>>,
+
         /// Enumeration elements
         #[serde(rename = "enum")]
         enum_items: Option<Vec<String>>,

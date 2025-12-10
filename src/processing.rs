@@ -53,6 +53,7 @@ fn process_schema(
         Schema::Typed {
             properties,
             enum_items,
+            required,
             ..
         } => {
             // if the root element is an object, then it must have properties
@@ -63,7 +64,12 @@ fn process_schema(
                     if !filter.is_property_accepted(schema_name, prop_name) {
                         continue;
                     }
-                    let field = process_schema_property(schema_name, &prop_name, prop_definition)?;
+                    let field = process_schema_property(
+                        schema_name,
+                        &prop_name,
+                        prop_definition,
+                        required.contains(prop_name),
+                    )?;
                     fields.push(field);
                 }
                 Ok(DataType::Struct {
@@ -80,7 +86,7 @@ fn process_schema(
                 // let's assume that this is a type alias
                 Ok(DataType::Alias {
                     alias: schema_name.to_owned(),
-                    info: process_schema_property(schema_name, "", definition)?,
+                    info: process_schema_property(schema_name, "", definition, true)?,
                 })
             }
         }
@@ -92,6 +98,7 @@ fn process_schema_property(
     schema_name: &str,
     name: &str,
     definition: &Schema,
+    is_required: bool,
 ) -> Result<StructField, Box<dyn Error>> {
     if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         // or should I try to transform it?
@@ -125,6 +132,7 @@ fn process_schema_property(
             all_of,
             any_of,
             one_of,
+            ..
         } => {
             if let Some(_) = properties {
                 // "properties" is specified, which means it is an object. We
@@ -135,7 +143,7 @@ fn process_schema_property(
                 Err(msg.into())
             } else if let Some(items) = items {
                 // "items" is specified, this is an array
-                let mut field = process_schema_property(schema_name, name, items)?;
+                let mut field = process_schema_property(schema_name, name, items, is_required)?;
                 field.array_dimensions += 1;
                 // trying to account for nullable
                 field.is_nullable = field.is_nullable | *nullable;
@@ -152,7 +160,8 @@ fn process_schema_property(
                     );
                 }
                 // behaves like a simple ref in this case
-                let mut field = process_schema_property(schema_name, name, &schemas[0])?;
+                let mut field =
+                    process_schema_property(schema_name, name, &schemas[0], is_required)?;
                 // trying to account for nullable
                 field.is_nullable = field.is_nullable | *nullable;
                 // trying to fill the description
@@ -164,7 +173,7 @@ fn process_schema_property(
                 // field can have one of the specified types
                 let mut types = vec![];
                 for schema in schemas {
-                    let field = process_schema_property(schema_name, name, schema)?;
+                    let field = process_schema_property(schema_name, name, schema, is_required)?;
                     types.extend(field.type_.to_vec());
                 }
                 Ok(StructField {
@@ -183,7 +192,7 @@ fn process_schema_property(
                     name: name.to_owned(),
                     type_: FieldType::Plain(schema_type.clone()),
                     type_format: format.clone(),
-                    is_nullable: *nullable,
+                    is_nullable: *nullable | !is_required,
                     descr: description.clone(),
                     array_dimensions: 0,
                 });
@@ -194,7 +203,7 @@ fn process_schema_property(
                     type_: FieldType::Plain("object".into()),
                     type_format: String::new(),
                     array_dimensions: 0,
-                    is_nullable: *nullable,
+                    is_nullable: *nullable | !is_required,
                     descr: description.clone(),
                 })
             }

@@ -15,6 +15,10 @@ components:
           type: string
         tag:
           type: string
+      required:
+        - id
+        - name
+        - tag
     Pets:
       type: array
       items:

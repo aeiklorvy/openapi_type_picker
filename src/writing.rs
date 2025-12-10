@@ -93,6 +93,12 @@ pub fn write_rust_code<W: Write>(
             DataType::Enum { name, items } => {
                 writeln!(w, "/// {name}")?; // keep the original name
                 if let Some(derives) = enum_derives {
+                    // remove "Display" trait if specified
+                    let derives: Vec<_> = derives
+                        .iter()
+                        .cloned()
+                        .filter(|item| item != "Display")
+                        .collect();
                     writeln!(w, "#[derive({})]", derives.join(", "))?;
                 } else {
                     writeln!(
@@ -100,6 +106,7 @@ pub fn write_rust_code<W: Write>(
                         "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]"
                     )?;
                 }
+
                 writeln!(w, "pub enum {} {{", name.to_case(Case::Pascal))?;
                 for item in items {
                     let rust_name = item.to_case(Case::Pascal);
@@ -111,7 +118,13 @@ pub fn write_rust_code<W: Write>(
                     writeln!(w, "{indent}{rust_name},")?;
                 }
                 writeln!(w, "}}\n")?;
-                write_display_impl_for_enum(w, dt)?;
+
+                // write display impl if Disaply was specified in derives
+                if let Some(derives) = enum_derives
+                    && derives.iter().find(|&item| item == "Display").is_some()
+                {
+                    write_display_impl_for_enum(w, dt)?;
+                }
             }
             DataType::Alias { alias, info } => {
                 let mut t = match &info.type_ {
