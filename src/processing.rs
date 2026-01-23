@@ -117,7 +117,7 @@ fn process_schema_property(
                 ),
                 type_format: String::new(),
                 array_dimensions: 0,
-                is_nullable: false,
+                is_nullable: !is_required,
                 descr: String::new(),
             });
         }
