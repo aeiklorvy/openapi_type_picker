@@ -4,10 +4,10 @@ use std::fmt::{Result, Write};
 
 /// Writes a description of the generated module (file)
 pub fn write_comment_header<W: Write>(w: &mut W) -> Result {
-    writeln!(w, "//! # OpenApi Types")?;
-    writeln!(w, "//! GENERATED AUTOMATICALLY, ALL THE CHANGES")?;
-    writeln!(w, "//! YOU MAKE WILL BE REWRITTEN DURING")?;
-    writeln!(w, "//! THE NEXT BUILD")?;
+    writeln!(w, "// # OpenApi Types")?;
+    writeln!(w, "// GENERATED AUTOMATICALLY, ALL THE CHANGES")?;
+    writeln!(w, "// YOU MAKE WILL BE REWRITTEN DURING")?;
+    writeln!(w, "// THE NEXT BUILD")?;
     writeln!(w)?; // add newline
     Ok(())
 }
