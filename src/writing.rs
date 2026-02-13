@@ -16,8 +16,8 @@ pub fn write_comment_header<W: Write>(w: &mut W) -> Result {
 pub fn write_rust_code<W: Write>(
     w: &mut W,
     datatypes: &[DataType],
-    struct_derives: Option<&Vec<String>>,
-    enum_derives: Option<&Vec<String>>,
+    struct_derives: &[String],
+    enum_derives: &[String],
 ) -> Result {
     let indent = "    "; // 4 * <space>
 
@@ -47,11 +47,7 @@ pub fn write_rust_code<W: Write>(
                 }
 
                 writeln!(w, "/// {name}")?; // keep the original name
-                if let Some(derives) = struct_derives {
-                    writeln!(w, "#[derive({})]", derives.join(", "))?;
-                } else {
-                    writeln!(w, "#[derive(Debug, Clone, Deserialize)]")?;
-                }
+                writeln!(w, "#[derive({})]", struct_derives.join(", "))?;
                 writeln!(w, "pub struct {} {{", name.to_case(Case::Pascal))?;
                 for field in fields {
                     let rust_name = fix_rust_keyword(field.name.to_case(Case::Snake));
@@ -92,20 +88,12 @@ pub fn write_rust_code<W: Write>(
             }
             DataType::Enum { name, items } => {
                 writeln!(w, "/// {name}")?; // keep the original name
-                if let Some(derives) = enum_derives {
-                    // remove "Display" trait if specified
-                    let derives: Vec<_> = derives
-                        .iter()
-                        .cloned()
-                        .filter(|item| item != "Display")
-                        .collect();
-                    writeln!(w, "#[derive({})]", derives.join(", "))?;
-                } else {
-                    writeln!(
-                        w,
-                        "#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]"
-                    )?;
-                }
+                let derives: Vec<_> = enum_derives
+                    .iter()
+                    .cloned()
+                    .filter(|item| *item != "Display")
+                    .collect();
+                writeln!(w, "#[derive({})]", derives.join(", "))?;
 
                 writeln!(w, "pub enum {} {{", name.to_case(Case::Pascal))?;
                 for item in items {
@@ -120,9 +108,7 @@ pub fn write_rust_code<W: Write>(
                 writeln!(w, "}}\n")?;
 
                 // write display impl if Disaply was specified in derives
-                if let Some(derives) = enum_derives
-                    && derives.iter().find(|&item| item == "Display").is_some()
-                {
+                if enum_derives.iter().any(|item| *item == "Display") {
                     write_display_impl_for_enum(w, dt)?;
                 }
             }
@@ -216,20 +202,12 @@ fn generate_union_name(one_of: &[String]) -> String {
 }
 
 /// Writes an "invisible" auxiliary structure
-fn write_union_type<W: Write>(
-    w: &mut W,
-    one_of: &[String],
-    struct_derives: Option<&Vec<String>>,
-) -> Result {
+fn write_union_type<W: Write>(w: &mut W, one_of: &[String], struct_derives: &[String]) -> Result {
     let indent = "    "; // 4 * <space>
 
     // yes, this is an enum, but it is used only for combining structs, so
     // derives from structs are used
-    if let Some(derives) = struct_derives {
-        writeln!(w, "#[derive({})]", derives.join(", "))?;
-    } else {
-        writeln!(w, "#[derive(Debug, Clone, Deserialize)]")?;
-    }
+    writeln!(w, "#[derive({})]", struct_derives.join(", "))?;
     writeln!(w, "#[serde(untagged)]")?;
     writeln!(w, "pub enum {} {{", generate_union_name(one_of))?;
     for t in one_of {
