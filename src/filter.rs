@@ -26,7 +26,7 @@ use std::{collections::HashMap, fs::File, path::Path};
 ///    - Debug
 ///    - Deserialize
 /// </pre>
-#[derive(Default, Deserialize)]
+#[derive(Deserialize)]
 pub struct FilterConfig {
     /// Names of schemes to include in the generated file
     pub include: Option<HashMap<String, SchemaFilter>>,
@@ -34,15 +34,36 @@ pub struct FilterConfig {
     pub exclude: Option<HashMap<String, SchemaFilter>>,
     /// Defines a list of `#[derive(...)]` when generating the structure. By
     /// default, `#[derive(Debug, Clone, serde::Deserialize)]`.
-    pub struct_derives: Option<Vec<String>>,
+    pub struct_derives: Vec<String>,
     /// Defines a list of `#[derive(...)]` when generating the enumeration. By
     /// default, `#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd,
     /// Ord, serde::Deserialize)]`.
-    pub enum_derives: Option<Vec<String>>,
+    pub enum_derives: Vec<String>,
     /// automatically adds schemas to the filter if the fields of another
     /// schema refer to it
     #[serde(default)]
     pub auto_include_dependencies: bool,
+}
+
+impl std::default::Default for FilterConfig {
+    fn default() -> Self {
+        Self {
+            struct_derives: vec!["Debug".into(), "Clone".into(), "Deserialize".into()],
+            enum_derives: vec![
+                "Debug".into(),
+                "Clone".into(),
+                "Copy".into(),
+                "PartialEq".into(),
+                "Eq".into(),
+                "PartialOrd".into(),
+                "Ord".into(),
+                "Deserialize".into(),
+            ],
+            include: Default::default(),
+            exclude: Default::default(),
+            auto_include_dependencies: Default::default(),
+        }
+    }
 }
 
 /// Filter element: either "*" or an array of strings

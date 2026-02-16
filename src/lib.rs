@@ -73,8 +73,8 @@ pub fn generate_openapi_types(
     writing::write_rust_code(
         &mut buf,
         &datatypes,
-        config.struct_derives.as_ref(),
-        config.enum_derives.as_ref(),
+        &config.struct_derives,
+        &config.enum_derives,
     )?;
 
     // removing the double line break to appease rustfmt
