@@ -34,10 +34,12 @@ pub struct FilterConfig {
     pub exclude: Option<HashMap<String, SchemaFilter>>,
     /// Defines a list of `#[derive(...)]` when generating the structure. By
     /// default, `#[derive(Debug, Clone, serde::Deserialize)]`.
+    #[serde(default)]
     pub struct_derives: Vec<String>,
     /// Defines a list of `#[derive(...)]` when generating the enumeration. By
     /// default, `#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd,
     /// Ord, serde::Deserialize)]`.
+    #[serde(default)]
     pub enum_derives: Vec<String>,
     /// automatically adds schemas to the filter if the fields of another
     /// schema refer to it
