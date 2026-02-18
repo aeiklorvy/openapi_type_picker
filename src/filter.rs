@@ -34,12 +34,12 @@ pub struct FilterConfig {
     pub exclude: Option<HashMap<String, SchemaFilter>>,
     /// Defines a list of `#[derive(...)]` when generating the structure. By
     /// default, `#[derive(Debug, Clone, serde::Deserialize)]`.
-    #[serde(default)]
+    #[serde(default = "get_default_struct_derives")]
     pub struct_derives: Vec<String>,
     /// Defines a list of `#[derive(...)]` when generating the enumeration. By
     /// default, `#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd,
     /// Ord, serde::Deserialize)]`.
-    #[serde(default)]
+    #[serde(default = "get_default_enum_derives")]
     pub enum_derives: Vec<String>,
     /// automatically adds schemas to the filter if the fields of another
     /// schema refer to it
@@ -50,22 +50,30 @@ pub struct FilterConfig {
 impl std::default::Default for FilterConfig {
     fn default() -> Self {
         Self {
-            struct_derives: vec!["Debug".into(), "Clone".into(), "Deserialize".into()],
-            enum_derives: vec![
-                "Debug".into(),
-                "Clone".into(),
-                "Copy".into(),
-                "PartialEq".into(),
-                "Eq".into(),
-                "PartialOrd".into(),
-                "Ord".into(),
-                "Deserialize".into(),
-            ],
+            struct_derives: get_default_struct_derives(),
+            enum_derives: get_default_enum_derives(),
             include: Default::default(),
             exclude: Default::default(),
             auto_include_dependencies: Default::default(),
         }
     }
+}
+
+fn get_default_struct_derives() -> Vec<String> {
+    vec!["Debug".into(), "Clone".into(), "Deserialize".into()]
+}
+
+fn get_default_enum_derives() -> Vec<String> {
+    vec![
+        "Debug".into(),
+        "Clone".into(),
+        "Copy".into(),
+        "PartialEq".into(),
+        "Eq".into(),
+        "PartialOrd".into(),
+        "Ord".into(),
+        "Deserialize".into(),
+    ]
 }
 
 /// Filter element: either "*" or an array of strings
