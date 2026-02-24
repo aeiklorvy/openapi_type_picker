@@ -100,8 +100,14 @@ fn process_schema_property(
     definition: &Schema,
     is_required: bool,
 ) -> Result<StructField, Box<dyn Error>> {
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-        // or should I try to transform it?
+    // trying to replace incorrect symbols for naming with their verbal
+    // equivalent ("-" as "minus", "$" as "dollar", ...)
+    let translated_name = translate_name(name);
+    // make sure the name is correct
+    if !translated_name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
         let msg = format!("property {schema_name:?}.{name:?} has untranslatable name");
         return Err(msg.into());
     }
@@ -110,6 +116,7 @@ fn process_schema_property(
         Schema::Ref { ref_ } => {
             return Ok(StructField {
                 name: name.to_owned(),
+                translated_name,
                 type_: FieldType::Plain(
                     ref_.strip_prefix("#/components/schemas/")
                         .unwrap()
@@ -178,6 +185,7 @@ fn process_schema_property(
                 }
                 Ok(StructField {
                     name: name.to_owned(),
+                    translated_name,
                     type_: FieldType::OneOf(types),
                     type_format: String::new(),
                     array_dimensions: 0,
@@ -190,6 +198,7 @@ fn process_schema_property(
                 // in this case, it's a primitive type
                 return Ok(StructField {
                     name: name.to_owned(),
+                    translated_name,
                     type_: FieldType::Plain(schema_type.clone()),
                     type_format: format.clone(),
                     is_nullable: *nullable | !is_required,
@@ -200,6 +209,7 @@ fn process_schema_property(
                 // nothing is specified, not even type - believe that the field can be any object
                 Ok(StructField {
                     name: String::new(),
+                    translated_name,
                     type_: FieldType::Plain("object".into()),
                     type_format: String::new(),
                     array_dimensions: 0,
@@ -306,4 +316,26 @@ fn find_dependend_schemas(
             }
         }
     }
+}
+
+fn translate_name(name: &str) -> String {
+    let mut result = String::with_capacity(name.len());
+
+    for c in name.chars() {
+        match c {
+            '$' => result += "_dollar_",
+            '#' => result += "_number_",
+            '%' => result += "_percent_",
+            '&' => result += "_ampersand_",
+            '(' => result += "_lparen_",
+            ')' => result += "_rparen_",
+            '*' => result += "_asterisk_",
+            '-' => result += "_minus_",
+            '@' => result += "_at_",
+            '?' => result += "_question_",
+            _ => result.push(c),
+        }
+    }
+
+    result
 }

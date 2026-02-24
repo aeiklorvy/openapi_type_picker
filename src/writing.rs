@@ -50,7 +50,7 @@ pub fn write_rust_code<W: Write>(
                 writeln!(w, "#[derive({})]", struct_derives.join(", "))?;
                 writeln!(w, "pub struct {} {{", name.to_case(Case::Pascal))?;
                 for field in fields {
-                    let rust_name = fix_rust_keyword(field.name.to_case(Case::Snake));
+                    let rust_name = fix_rust_keyword(field.translated_name.to_case(Case::Snake));
 
                     let mut t = match &field.type_ {
                         FieldType::Plain(t) => get_rust_type(t, &field.type_format),
@@ -70,7 +70,7 @@ pub fn write_rust_code<W: Write>(
                     }
                     // if the name of the property differs according to the
                     // naming rules of Rust
-                    if field.name != rust_name {
+                    if field.translated_name != rust_name || field.name != field.translated_name {
                         writeln!(w, "{indent}#[serde(rename = {:?})]", field.name)?;
                     }
                     // Special instructions are required for [`OffsetDateTime`]

@@ -43,6 +43,9 @@ impl DataType {
 pub struct StructField {
     /// Field name
     pub name: String,
+    /// Translated name (if the original name contains characters that are not
+    /// allowed for the Rust name)
+    pub translated_name: String,
     /// Field type
     pub type_: FieldType,
     /// "format" property, is present
